@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true })); //url-encoded
+app.use(bodyParser.json()); //json
 app.use(express.static('./webpage'));
 
 //#### ログ用 ####
@@ -26,7 +27,7 @@ const connection = mysql.createConnection({
 //ufwで 443ポート開放済み (実行にroot権限必須)
 const port=443;
 
-console.log("Working…");
+console.log("動作開始");
 
 https.createServer({
     key: fs.readFileSync('./cert/privkey.pem'),
@@ -77,9 +78,10 @@ app.post('/API/Entry', (req, res) => {
     let datetime = new Date();
 
     let user_agent = 'Unknown';
-    if (req.body.user_agent) {
-        user_agent = req.body.user_agent;
+    if (req.body['user_agent']) {
+        user_agent = req.body['user_agent'];
     }
+    //console.log(req.body['user_agent']);
     let auth_code1 = Array.from(crypto.randomFillSync(new Uint8Array(6))).map((n) => S1[n % S1.length]).join('');
     let auth_code2 = Array.from(crypto.randomFillSync(new Uint8Array(6))).map((n) => S2[n % S2.length]).join('');
     connection.beginTransaction((err) => {
@@ -103,7 +105,7 @@ app.post('/API/Entry', (req, res) => {
                             res.json({ 'result': 'Server Error 02' });
                         }else{
                             //SELECT成功
-                            console.log(`id: ${results[0]['id']}\nauth_code: ${results[0]['auth_code']}`);
+                            console.log(`新規登録しました。  ${results[0]['id']}  ${results[0]['auth_code']}`);
                             //これがいまついかしたID = とうろくID と認証コード
                             let rjson = {
                                 'result': 'OK',
@@ -130,9 +132,10 @@ app.post('/API/Entry', (req, res) => {
 
 //QR記録
 app.post('/API/RecordQR', (req, res) => {
-    let id = req.body.id;
-    let auth_code = req.body.auth_code;
-    let qr = req.body.qr;
+    let id = req.body['id'];
+    let auth_code = req.body['auth_code'];
+    let qr = req.body['qr'];
+    console.log(`QRを記録しました。  ${id}  ${auth_code}  ${qr}`);
     connection.beginTransaction((err) => {
         if(err){
             //トランザクション開始失敗
@@ -178,8 +181,9 @@ app.post('/API/RecordQR', (req, res) => {
 
 //QR確認  (トランザクションいらなそう)
 app.post('/API/GetQR', (req, res) => {
-    let id = req.body.id;
-    let auth_code = req.body.auth_code;
+    let id = req.body['id'];
+    let auth_code = req.body['auth_code'];
+    console.log(`${id} ${auth_code} ${qr}`);
     connection.beginTransaction((err)=>{
         if(err){
             //トランザクション開始失敗

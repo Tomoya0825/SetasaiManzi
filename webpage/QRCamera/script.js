@@ -9,6 +9,9 @@ const canvas = canvasElement.getContext("2d");
   LocalStrageまわり注意(プライベートブラウジングとかだとアウト)
 ##########################################*/
 
+var id = ""
+var auth_code = ""
+
 if (!window.localStorage) {
     //localStrage使えない(よほど古い)
     alert("ご利用のブラウザはlocalstorageに非対応のため利用できません。");
@@ -19,13 +22,15 @@ if (!window.localStorage) {
     show_popup3();
 } else {
     //だいじょうぶそう(プライぺートブラウジングである場合を除く…)
-    if (!localStorage.getItem("ID") && !localStorage.getItem("auth_code")) {
+    if (!localStorage.getItem("id") || !localStorage.getItem("auth_code")) {
         alert("QRコードの読み取りのためにカメラの使用許可をお願いします。");
         post("https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/Entry", { "user_agent": "TestUserManzi" }).then(data => {
             if (data) {
                 if (data.result == "OK") {
-                    localStorage.setItem("id", data.id);
-                    localStorage.setItem("auth_code", data.auth_code);
+                    localStorage.setItem("id", data['id']);
+                    localStorage.setItem("auth_code", data['auth_code']);
+                    id = data['id'];
+                    auth_code = data['auth_code'];
                 } else {
                     //サーバ側処理失敗
                 }
@@ -33,7 +38,12 @@ if (!window.localStorage) {
                 //通信失敗 or 応答なし
             }
         });
+    } else {
+        id = localStorage.getItem("id");
+        auth_code = localStorage.getItem("auth_code");
     }
+
+
 
     // 縦横比1に  aspectRatio: 1
     navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: "environment", aspectRatio: 1 } }).then((stream) => {
@@ -51,19 +61,32 @@ if (!window.localStorage) {
         var scanqr = setInterval(() => {
             canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
             var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            var qr_object = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts: "dontInvert"});
+            var qr_object = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
             if (qr_object && (qr_object.data.indexOf("tcu_") != -1)) {
                 clearInterval(scanqr);
-                submit_qr(qr_object.data);
+
+                post('https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/RecordQR', {
+                    "id": `${id}`,
+                    "auth_code": `${auth_code}`,
+                    "qr": `${qr_object.data}`
+                }).then(data => {
+                    if (data) {
+                        if (data.result == "OK") {
+                            alert("しゅうりょ");
+                            //飛ばしたりする
+                        } else {
+                            //サーバ側処理失敗
+                        }
+                    } else {
+                        //通信失敗 or 応答なし
+                    }
+                });
+
             }
         }, 100);
     });
 }
 
-function submit_qr(qr_text){
-    //途中========
-    post('https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/RecordQR', {});
-}
 
 //手動入力時
 function submit() {
@@ -77,7 +100,7 @@ function post(url = '', data = {}) {
         mode: "cors",
         cache: "no-cache",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/x-www-form-urlenqr_objectd" },
+        headers: { "Content-Type": "application/json; charset=utf-8" },
         redirect: "follow",
         referrer: "no-referrer",
         body: JSON.stringify(data)

@@ -74,11 +74,8 @@ connection.query('SELECT * FROM qrtable ORDER BY sortid;', (err, results)=>{
         st_qrlist = qrlist.join(', ');
         console.log(st_qrlist);
         //ここに処理かくか非同期のやつなんやかんや。
-
     }
 });
-
-
 
 
 //CREATE TABLE setasai (id INT AUTO_INCREMENT NOT NULL PRIMARY KEY, auth_code CHAR(13), user_agent char(150), year YEAR, date TINYINT, time TIME, tcu_Ichigokan TINYINT(1) DEFAULT 0, tcu_Syokudou TINYINT(1) DEFAULT 0, tcu_Goal TINYINT(1) DEFAULT 0);
@@ -90,10 +87,9 @@ const S2 = "123456789"
 //登録
 app.post('/API/Entry', (req, res) => {
     let datetime = new Date();
-
     let user_agent = 'Unknown';
-    if (req.body['user_agent']) {
-        user_agent = req.body['user_agent'];
+    if(req.header('User-Agent')){
+        user_agent = req.header('User-Agent');
     }
     //console.log(req.body['user_agent']);
     let auth_code1 = Array.from(crypto.randomFillSync(new Uint8Array(6))).map((n) => S1[n % S1.length]).join('');
@@ -105,7 +101,7 @@ app.post('/API/Entry', (req, res) => {
         }else{
             //トランザクション開始成功
             connection.query(`INSERT INTO setasai(auth_code, user_agent, year, date, time) VALUES ('${auth_code1}-${auth_code2}', '${user_agent}', ${datetime.getFullYear()}, ${datetime.getDate()},\
-            '${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}');`, (err) => {
+            '${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}');`,(err) => {
                 if(err){
                     //INSERT失敗
                     connection.rollback();

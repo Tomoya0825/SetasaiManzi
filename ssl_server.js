@@ -26,6 +26,8 @@ const connection = mysql.createConnection({
 //ufwで 443ポート開放済み (実行にroot権限必須)
 const port=443;
 
+console.log("Working…");
+
 https.createServer({
     key: fs.readFileSync('./cert/privkey.pem'),
     cert: fs.readFileSync('./cert/cert.pem'),

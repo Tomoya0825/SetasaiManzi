@@ -19,13 +19,13 @@ if (!window.localStorage) {
     show_popup3();
 } else {
     //だいじょうぶそう(プライぺートブラウジングである場合を除く…)
-    if (!localStorage.getItem("ID") && !localStorage.getItem("auth_qr_object")) {
+    if (!localStorage.getItem("ID") && !localStorage.getItem("auth_code")) {
         alert("QRコードの読み取りのためにカメラの使用許可をお願いします。");
         post("https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/Entry", { "user_agent": "TestUserManzi" }).then(data => {
             if (data) {
                 if (data.result == "OK") {
                     localStorage.setItem("id", data.id);
-                    localStorage.setItem("auth_qr_object", data.auth_qr_object);
+                    localStorage.setItem("auth_code", data.auth_code);
                 } else {
                     //サーバ側処理失敗
                 }

@@ -61,11 +61,25 @@ https://qiita.com/ucan-lab/items/3ae911b7e13287a5b917
 
 //===============================返すJSON入れ子にすればQRもDBにできるのでは????========================================
 
-const qr1="tcu_Ichigokan";
-const qr2="tcu_Syokudou";
-const qr3="tcu_Goal";
-const qr4="";
-const qr5="";
+var qrlist = [];
+var st_qrlist="";   // tcu_Ichgokan, tcu_Syokudou, …
+
+connection.query('SELECT * FROM qrtable ORDER BY sortid;', (err, results)=>{
+    if(err){
+        //エラッたとしても何度かリトライするようにする
+    }else{
+        for(let index in results){
+            qrlist.push(results[index]['qr']);
+        }
+        st_qrlist = qrlist.join(', ');
+        console.log(st_qrlist);
+        //ここに処理かくか非同期のやつなんやかんや。
+
+    }
+});
+
+
+
 
 //CREATE TABLE setasai (id INT AUTO_INCREMENT NOT NULL PRIMARY KEY, auth_code CHAR(13), user_agent char(150), year YEAR, date TINYINT, time TIME, tcu_Ichigokan TINYINT(1) DEFAULT 0, tcu_Syokudou TINYINT(1) DEFAULT 0, tcu_Goal TINYINT(1) DEFAULT 0);
 
@@ -105,7 +119,6 @@ app.post('/API/Entry', (req, res) => {
                             res.json({ 'result': 'Server Error 02' });
                         }else{
                             //SELECT成功
-                            console.log(`新規登録しました。  ${results[0]['id']}  ${results[0]['auth_code']}`);
                             //これがいまついかしたID = とうろくID と認証コード
                             let rjson = {
                                 'result': 'OK',
@@ -121,6 +134,7 @@ app.post('/API/Entry', (req, res) => {
                                 }
                                 //最終処理
                                 res.json(rjson);
+                                console.log(`新規登録しました。  ${results[0]['id']}  ${results[0]['auth_code']}`);
                             });//COMMIT
                         }
                     });//クエリ SELECT
@@ -135,7 +149,6 @@ app.post('/API/RecordQR', (req, res) => {
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
     let qr = req.body['qr'];
-    console.log(`QRを記録しました。  ${id}  ${auth_code}  ${qr}`);
     connection.beginTransaction((err) => {
         if(err){
             //トランザクション開始失敗
@@ -169,6 +182,7 @@ app.post('/API/RecordQR', (req, res) => {
                             }else{
                                 //COMMIT成功
                                 res.json({ 'result': 'OK' });
+                                console.log(`QRを記録しました。  ${id}  ${auth_code}  ${qr}`);
                             }
                         });//COMMIT
                     }
@@ -183,14 +197,13 @@ app.post('/API/RecordQR', (req, res) => {
 app.post('/API/GetQR', (req, res) => {
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
-    console.log(`${id} ${auth_code} ${qr}`);
     connection.beginTransaction((err)=>{
         if(err){
             //トランザクション開始失敗
             res.json({ 'result': 'Server Error 20' });
         }else{
             //トランザクション開始成功
-            connection.query(`SELECT ${qr1}, ${qr2}, ${qr3} FROM setasai WHERE id=${id} AND auth_code='${auth_code}';`, (err, results)=>{
+            connection.query(`SELECT ${st_qrlist} FROM setasai WHERE id=${id} AND auth_code='${auth_code}';`, (err, results)=>{
                 if(err){
                     //SELECT失敗
                     connection.rollback();
@@ -210,12 +223,11 @@ app.post('/API/GetQR', (req, res) => {
                                 res.json({ 'result': 'Server Error 22' });
                             }else{
                                 //COMMIT成功
-                                res.json({
-                                    'result': 'OK',
-                                    [qr1]:`${results[0][qr1]}`,
-                                    [qr2]:`${results[0][qr2]}`,
-                                    [qr3]:`${results[0][qr3]}`
-                                });
+                                let rsjson={"result": "OK"};
+                                for(index in qrlist){
+                                    rsjson[`${qrlist[index]}`] = results[0][`${qrlist[index]}`];
+                                }                      
+                                res.json(rsjson);
                             }
                         });//COMMIT
                     }

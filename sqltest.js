@@ -8,9 +8,7 @@ const connection = mysql.createConnection({
     database: 'setasai'
 });
 
-var qrlist={};  //連想配列  { 1 : tcu_Ichgokan } ({ index : QR名 })
-
-//gittestsuyami3
+var qrlist=[];  //連想配列  { 1 : tcu_Ichgokan } ({ index : QR名 })
 
 connection.query('SELECT * FROM qrtable;', (err, results)=>{
     if(err){
@@ -19,7 +17,7 @@ connection.query('SELECT * FROM qrtable;', (err, results)=>{
         for(let index in results){
             qrlist[results[index]['qrid']] = results[index]['qr_text'];
         }
-        console.log(qrlist['1']);
+        console.log(Object.values(qrlist).join(', '));
 
         //ここに処理かくか非同期のやつなんやかんや。
 

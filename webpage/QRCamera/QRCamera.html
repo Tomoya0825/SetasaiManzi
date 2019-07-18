@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!-- favicon未設定 -->
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="東京都市大学 世田谷祭 QRスタンプラリー">
+    <meta name="theme-color" content="#4d639f">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>世田谷祭QRリーダー</title>
+    <script type="text/javascript" src="jsQR.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans+JP:400,500&display=swap&subset=japanese" rel="stylesheet">
+</head>
+
+<body>
+    <div id="mainbox"> <!--さいしょから表示するやつ-->
+        <canvas id="videocanvas"></canvas> <!--カメラ映像表示&解析利用-->
+        <div id="controlbox"> <!--ボタンとか-->
+            <p class="notosans" id="dstext">QRコードを映してください</p>
+            <a class="button" id="toplink_button" href="../index.html">Topページへもどる</a>
+            <a class="button" id="popup1_button" onclick="show_popup1()">読み取れない場合</a>
+            <a class="button" id="popup2_button" onclick="show_popup2()">カメラが映らない場合</a>
+            <a id="licenselink" href="License.html">ライセンス</a>
+        </div>
+    </div>
+
+    <div id="popupbox"> <!--必要に応じてポップアップ表示するやつ-->
+        <div class="popup" id="popup1"> <!--読み取れない場合-->
+            <a class="button closebutton" onclick="close_popup1()">閉じる</a>
+            <p class="notosans">QR下に表記されている文字を入力してボタンを押してください。</p>
+            <div id="formbox">
+                <input type="text" id="textbox">
+                <a class="button" id="submit_button" onclick="submit()">送信</a>
+            </div>
+        </div>
+
+        <div class="popup" id="popup2"> <!--カメラが映らない場合-->
+            <a class="button closebutton" onclick="close_popup2()">閉じる</a>
+            <p>下記の対応ブラウザの最新版をご利用いただくか、「読み取れない場合」をご参照ください。</p>
+            <p>Google Chrome</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.android.chrome'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id535886823"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Mozilla Firefox</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=org.mozilla.firefox'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id989804926"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Opera</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.opera.browser'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id1411869974"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Microsoft Edge</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.microsoft.emmx'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id1288723196"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>など…</p>
+        </div>
+
+        <div class="popup" id="popup3"> <!--カメラ非対応ブラウザの場合-->
+            <a class="button" id="toplink_button" href="../index.html">Topページへもどる</a>
+            <p>下記の対応ブラウザの最新版をご利用ください。</p>
+            <a class="button" id="nosupport_button" onclick="close_popup3()">他のブラウザの最新版が利用できない場合</a>
+            <p>Google Chrome</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.android.chrome'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id535886823"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Mozilla Firefox</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=org.mozilla.firefox'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id989804926"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Opera</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.opera.browser'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id1411869974"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>Microsoft Edge</p>
+            <div class="flex-row">
+                <a href='https://play.google.com/store/apps/details?id=com.microsoft.emmx'><img class="bannerimg" src='PlayStore.png' /></a>
+                <a href="https://apps.apple.com/jp/app/id1288723196"><img class="bannerimg" src="AppStore.svg"></a>
+            </div>
+            <p>など…</p>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="script.js"></script> <!--canvas描画,QR解析-->
+</body>
+
+</html>

@@ -1,0 +1,43 @@
+/* html{
+    margin: 0;
+    padding: 0;
+} */
+
+body{
+    margin: 0;
+    padding: 0;
+}
+
+.NavBar{
+    width:100vw;
+    height: 6vh;
+}
+
+.CameraButton{
+    margin-left: 1vw;
+    height: 6vh;
+    width: 6vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.CameraIcon{
+    width: 90%;
+    height: 90%;
+}
+
+.CameraButton:hover{
+    background-color: aqua;
+}
+
+.TopBox{
+    width: 100vw;
+    height: 35vh;
+    background-color: rgb(60, 200, 224);
+}
+.BottomBox{
+    width: 100vw;
+    height: 55vh;
+    background-color: rgb(93, 235, 123);
+}

@@ -1,0 +1,131 @@
+body{
+    margin: 0;
+    padding: 0;
+}
+
+.notosans{
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 400;
+}
+.notosans_r{
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+}
+.button{
+    text-align: center;
+    height: 1.5em;
+    padding: 0.2em 1em;
+    border-radius: 3px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+    margin: 0.3em;
+}
+/*ボタンのフォントは Noto Sans 500 で固定
+  background-color と color は別で指定 */
+#controlbox{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 1em;
+}
+#dstext{
+    white-space: nowrap;
+    margin: 0;
+}
+#toplink_button{
+    color: white;
+    background-color: rgb(235, 125, 35);
+}
+#popup1_button{
+    color: white;
+    background-color: rgb(25, 130, 225); 
+}
+#popup2_button{
+    color: white;
+    background-color: rgb(10, 150, 50);
+}
+
+
+
+
+.popup{
+    width: 90vw;
+    height: 70vh;
+    padding-left: 1em;
+    padding-right: 1em;
+    background-color: rgba(210, 210, 210, 0.9);
+    border-radius: 1em;
+    overflow: scroll;
+    /*画面中央ポップアップ表示*/
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    position: absolute;
+    display: none;
+}
+.bannerimg{
+    height: 3em;
+}
+.closebutton{
+    color: white;
+    background-color: rgb(235, 125, 35);
+}
+
+
+#formbox{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+#submit_button{
+    color: white;
+    background-color: rgb(235, 125, 35);
+}
+
+
+#nosupport_button{
+    color: white;
+    background-color: rgb(235, 125, 35);
+}
+
+.flex-row{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+/*flex横並び、中央寄せ*/
+
+
+/*たてなが*/
+@media(orientation: portrait){
+    #mainbox{
+        display: flex;
+        flex-direction: column;
+    }
+    #videocanvas{
+        width:100%;
+    }
+    .button{
+        width: 60vw;
+    }
+}
+/*よこなが*/
+@media(orientation: landscape){
+    #mainbox{
+        display: flex;
+        flex-direction: row;
+    }
+    #videocanvas{
+        width: 50%;
+    }
+    .button{
+        width: 40vw;
+    }
+}

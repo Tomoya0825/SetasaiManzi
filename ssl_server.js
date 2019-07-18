@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql');
-const crypto = require('crypto');   //いらんかも
+const crypto = require('crypto');
 const log4js = require('log4js');
 const https = require('https');
 const fs = require('fs');
@@ -37,7 +37,6 @@ https.createServer({
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   @@@@@@@@@@@@@@@@@@@@@@!!!!!!!! SQLインジェクション脆弱性直す !!!!!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  -SSL対応
   -ログ対応
   -各所修正しやすいように
   -ムダなトランザクション消す

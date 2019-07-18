@@ -61,8 +61,8 @@
 
 ```json
 {
-    'tcu_Ichigokan': 1, 
-    'tcu_Syokudou': 0,
-    'tcu_Goal': 0
+    "tcu_Ichigokan": 1, 
+    "tcu_Syokudou": 0,
+    "tcu_Goal": 0
 }
 ```

@@ -38,8 +38,9 @@ https.createServer({
 /*=======================
   ##TaskList##
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@@@@@@@!!!!!!!! SQLインジェクション脆弱性直す !!!!!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  @@@@@@@@@@@@@@@@@@@@@@!!!!!!!! SQLインジェクション脆弱性検証 !!!!!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  -型わかるように
   -ログ対応
   -各所修正しやすいように
   -ムダなトランザクション消す
@@ -64,7 +65,7 @@ https://qiita.com/ucan-lab/items/3ae911b7e13287a5b917
 var qrlist = [];
 var st_qrlist="";   // tcu_Ichgokan, tcu_Syokudou, …
 
-connection.query('SELECT * FROM qrtable ORDER BY sortid;', (err, results)=>{
+connection.query("SELECT * FROM qrtable ORDER BY sortid;", (err, results)=>{
     if(err){
         //エラッたとしても何度かリトライするようにする
     }else{
@@ -100,15 +101,16 @@ app.post('/API/Entry', (req, res) => {
             res.json({ 'result': 'Server Error 00' });
         }else{
             //トランザクション開始成功
-            connection.query(`INSERT INTO setasai(auth_code, user_agent, year, date, time) VALUES ('${auth_code1}-${auth_code2}', '${user_agent}', ${datetime.getFullYear()}, ${datetime.getDate()},\
-            '${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}');`,(err) => {
+            connection.query("INSERT INTO setasai(auth_code, user_agent, year, date, time) VALUES (?, ?, ?, ?, ?);",
+            [`${auth_code1}-${auth_code2}`, `${user_agent}`, datetime.getFullYear(), datetime.getDate(), 
+            `${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}`],(err) => {
                 if(err){
                     //INSERT失敗
                     connection.rollback();
                     res.json({ 'result': 'Server Error 01' });
                 }else{
                     //INSERT成功
-                    connection.query(`SELECT id, auth_code FROM setasai WHERE id=LAST_INSERT_ID();`, (err, results) => {
+                    connection.query("SELECT id, auth_code FROM setasai WHERE id=LAST_INSERT_ID();", (err, results) => {
                         if(err){
                             //SELECT失敗
                             connection.rollback();
@@ -151,7 +153,9 @@ app.post('/API/RecordQR', (req, res) => {
             res.json({ 'result': 'Server Error 10' });
         }else{
             //トランザクション開始成功
-            connection.query(`UPDATE setasai SET ${qr}=1 WHERE id=${id} AND auth_code='${auth_code}';`, (err, results)=>{
+            connection.query(`UPDATE setasai SET ??=1 WHERE id=? AND auth_code=?;`,
+            [`${qr}`, `${id}`, `${auth_code}`],(err, results)=>{
+                console.log(err);
                 if(err){
                     //UPDATE失敗
                     connection.rollback();
@@ -193,13 +197,18 @@ app.post('/API/RecordQR', (req, res) => {
 app.post('/API/GetQR', (req, res) => {
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
+
+    //console.log(typeof(id));
+    //console.log(typeof(auth_code));
+
     connection.beginTransaction((err)=>{
         if(err){
             //トランザクション開始失敗
             res.json({ 'result': 'Server Error 20' });
         }else{
             //トランザクション開始成功
-            connection.query(`SELECT ${st_qrlist} FROM setasai WHERE id=${id} AND auth_code='${auth_code}';`, (err, results)=>{
+            connection.query(`SELECT ?? FROM setasai WHERE id=? AND auth_code=?;`, 
+            [qrlist, `${id}`, `${auth_code}`],(err, results)=>{
                 if(err){
                     //SELECT失敗
                     connection.rollback();

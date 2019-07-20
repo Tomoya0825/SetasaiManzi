@@ -2,90 +2,136 @@ const video = document.createElement("video");
 const canvasElement = document.getElementById("videocanvas");
 const canvas = canvasElement.getContext("2d");
 
-/*##########################################
-  getUserMedia は Safari, Edgeとかに非対応? (バージョンによる?)(要検証)
-  IEはもちろん動かない。
+const baseUrl="https://v133-130-100-78.a029.g.tyo1.static.cnode.io";
+var id="";
+var auth_code="";
 
-  LocalStrageまわり注意(プライベートブラウジングとかだとアウト)
-##########################################*/
-
-var id = ""
-var auth_code = ""
-
-if (!window.localStorage) {
-    //localStrage使えない(よほど古い)
-    alert("ご利用のブラウザはlocalstorageに非対応のため利用できません。");
+if(!window.localStorage){
+    //localStrage使えない(なぞブラウザ)
+    alert("ご利用のブラウザはlocalStrageに非対応のため利用できません。");
     show_popup3();
-} else if (!navigator.mediaDevices) {
+    recordClientError("Not Support (localStrage)", 'info');
+    location.href = "../index.html";
+}else if(!navigator.mediaDevices){
     //mediaDevices使えない(ちょっと古いかSafari)
     alert("ご利用のブラウザはカメラ機能に非対応のため利用できません。");
     show_popup3();
-} else {
-    //だいじょうぶそう(プライぺートブラウジングである場合を除く…)
-    if (!localStorage.getItem("id") || !localStorage.getItem("auth_code")) {
-        alert("QRコードの読み取りのためにカメラの使用許可をお願いします。");
-        post("https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/Entry", { "user_agent": "TestUserManzi" }).then(data => {
-            if (data) {
-                if (data.result == "OK") {
-                    localStorage.setItem("id", data['id']);
-                    localStorage.setItem("auth_code", data['auth_code']);
-                    id = data['id'];
-                    auth_code = data['auth_code'];
-                } else {
-                    //サーバ側処理失敗
-                }
-            } else {
-                //通信失敗 or 応答なし
-            }
-        });
-    } else {
-        id = localStorage.getItem("id");
-        auth_code = localStorage.getItem("auth_code");
-    }
+    recordClientError("Not Support (mediaDevices)", 'info');
+    location.href = "../index.html";
+}
 
 
-
-    // 縦横比1に  aspectRatio: 1
-    navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: "environment", aspectRatio: 1 } }).then((stream) => {
-        video.srcObject = stream;
-        video.play()
-
-        var wait = setInterval(() => {
-            if ((video.readyState === video.HAVE_ENOUGH_DATA)) {
-                clearInterval(wait);
-                canvasElement.width = video.videoWidth;
-                canvasElement.height = video.videoHeight;
-            }
-        }, 100);
-
-        var scanqr = setInterval(() => {
-            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            var qr_object = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-            if (qr_object && (qr_object.data.indexOf("tcu_") != -1)) {
-                clearInterval(scanqr);
-
-                post('https://v133-130-100-78.a029.g.tyo1.static.cnode.io/API/RecordQR', {
-                    "id": `${id}`,
-                    "auth_code": `${auth_code}`,
-                    "qr": `${qr_object.data}`
-                }).then(data => {
-                    if (data) {
-                        if (data.result == "OK") {
-                            alert("しゅうりょ");
-                            //飛ばしたりする
-                        } else {
-                            //サーバ側処理失敗
-                        }
-                    } else {
-                        //通信失敗 or 応答なし
-                    }
-                });
-
-            }
-        }, 100);
+if(!localStorage.getItem("id") || !localStorage.getItem("auth_code")){
+    //ブラウザにユーザ情報なし
+    alert("QRコードの読み取りのためにカメラの使用許可をお願いします。");
+    post(`${baseUrl}/API/Entry`).then((res)=>{
+        if(res['result']=='OK'){
+            localStorage.setItem('id', res['id']);
+            localStorage.setItem('auth_code', res['auth_code']);
+            id = res['id'];
+            auth_code = res['auth_code'];
+        }else{
+            //エラー(通信?やサーバ側)
+            alert("エラーが発生しました。");
+            recordClientError('Entry Error');
+            location.href = "../index.html";//まあ一応(できないかもだけど)
+        }
+    }).catch((err)=>{
+        alert("エラーが発生しました。");
+        recordClientError('Entry Post Error');
+        location.reload();
+    });
+}else{
+    //情報アリ
+    id = localStorage.getItem("id");
+    auth_code = localStorage.getItem("auth_code");
+    //GetQRつかって認証してみてユーザ情報ちゃんと使えるか確認
+    post(`${baseUrl}/API/GetQR`,{
+        "id": id,
+        "auth_code": auth_code,
+        "verification": 'true'
+    }).then((res)=>{
+        if(res['result']=='OK'){
+            //問題ナシ
+        }else if(res['result']=='Auth Faild'){
+            //アカウント情報新しく作る必要アリ @@@@@@@@ 対応どうする @@@@@@@@
+            alert("IDを新規発行します。");
+            recordClientError('Re-Entry');
+            localStorage.removeItem("id");
+            localStorage.removeItem("auth_code");
+            location.reload();
+        }else if(res['result']=='Lack Of Parameter'){
+            //プライベートブラウジングの可能性
+            alert(`プライベートブラウジングの場合は通常モードでご利用ください。通常モードでご利用の場合、非対応ブラウザの可能性があります。`)
+            recordClientError('Possibilities of private browsing', 'info');
+            location.href = "../index.html";
+        }else{
+            //エラー
+            alert("エラーが発生しました。");
+            recordClientError('(Verification) GetQR Error');
+            location.href = "../index.html" ;
+        }
     });
 }
+
+var scan;
+navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:"environment",aspectRatio:1}}).then((stream)=>{
+    video.srcObject = stream;
+    video.play();
+
+    let time = new Date();
+    let wait = setInterval(()=>{
+        if(video.readyState === video.HAVE_ENOUGH_DATA){
+            clearInterval(wait);
+            canvasElement.width = video.videoWidth;
+            canvasElement.height = video.videoHeight;
+        }else{
+            //1.5秒以上カメラが起動できないとき
+            if((new Date())-time>=1500){
+                clearInterval(wait);
+                alert("ほかのタブで開いてるQRカメラを閉じてOKを押してください。");
+                recordClientError('Camera Startup Error (Tab)', 'info');
+                location.reload();     
+            }
+        }
+    },100);
+    scan = setInterval(()=>{
+        canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        let image = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        let qrobj = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+        if(qrobj && (qrobj['data'].indexOf('tcu_')!=-1)){
+            clearInterval(scan);
+            post(`${baseUrl}/API/RecordQR`,{
+                "id": id,
+                "auth_code": auth_code,
+                "qr": qrobj['data']
+            }).then((res)=>{
+                if(res['result']=='OK'){
+                    location.href = "../Uniquepage/index.html?result=ok";//ok
+                    //登録した場合
+                }else if(res['result']=='Alrady Recorded'){
+                    location.href = "../Uniquepage/index.html?result=recoded";//recoded
+                    //登録済みの場合
+                }else{
+                    //エラー
+                    alert("エラーが発生しました。");
+                    recordClientError('RecordQR Error');
+                    location.reload();
+                }
+            }).catch((err)=>{
+                alert("エラーが発生しました。");
+                recordClientError('RecordQR Post Error');
+                location.reload();
+            });
+        }else{
+            //なんもしない(まつ)
+        }
+    },100);
+}).catch((err)=>{
+    alert("エラーが発生しました。\nカメラをブロックしてしまった場合、ブラウザの設定よりカメラの使用許可をお願いします。");
+    recordClientError('getUserMedia Error');
+    location.href = "../index.html";
+});
 
 
 //手動入力時
@@ -93,7 +139,7 @@ function submit() {
     alert(document.getElementById("textbox").value);
 }
 
-
+//fetch API使う用
 function post(url = '', data = {}) {
     return fetch(url, {
         method: "POST",
@@ -104,27 +150,41 @@ function post(url = '', data = {}) {
         redirect: "follow",
         referrer: "no-referrer",
         body: JSON.stringify(data)
-    }).then(response => response.json());
+    }).then(response => response.json()).catch((err)=>{
+        //ここのエラーなぞに影響ないのにいろいろ発生するのであえて処理しない。
+    });
 }
+
+//いちおう
+function recordClientError(errmsg='', level='error'){
+    return post(`${baseUrl}/API/RecordClientError`,{
+            "id": id,
+            "auth_code": auth_code,
+            "error": errmsg,
+            "level": level
+    });
+}
+
 
 
 //以下表示用関数
 function show_popup1() {
-    clearInterval(tickfunc);
+    clearInterval(scan);
     document.getElementById("popup1").style.display = "inline";
 }
 function close_popup1() {
-    tickfunc = setInterval(tick, 100);
     document.getElementById("popup1").style.display = "none";
+    location.reload();
 }
 
 function show_popup2() {
-    clearInterval(tickfunc);
+    clearInterval(scan);
+    recordClientError('Camera Not Working Button Pushed', 'info');
     document.getElementById("popup2").style.display = "inline";
 }
 function close_popup2() {
-    tickfunc = setInterval(tick, 100);
     document.getElementById("popup2").style.display = "none";
+    location.reload();
 }
 
 function show_popup3() {

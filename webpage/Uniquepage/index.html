@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    
+</head>
+
+<body>
+    <p id="test"></p>
+
+    <script lang="javascript">
+            if(location.search.indexOf("result=ok")!=-1){
+                document.getElementById("test").innerText="記録しました。";
+            }else if(location.search.indexOf("result=recoded")!=-1){
+                document.getElementById("test").innerText="記録済みです。";
+            }else{
+                document.getElementById("test").innerText="";
+            }
+        </script>
+</body>
+
+</html>

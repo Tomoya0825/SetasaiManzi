@@ -17,13 +17,13 @@ log4js.configure({
         sqlhistory:{type:'file', filename:'./log/sqlHistory.log'},
         serverLog:{type:'file', filename: './log/serverLog.log'},
         fatalLog:{type:'fileSync', filename: './log/serverLog.log'},
-        mainLog:{type:'file', filename:'./log/mainLog.log'},
+        historyLog:{type:'file', filename:'./log/historyLog.log'},
         clientErrorLog:{type:'file', filename:'./log/clientErrorLog.log'},
         consoleout:{type:'console'}
     },
     categories:{
-        default:{appenders:['sqlhistory', 'mainLog', 'consoleout'], level:'ALL'},
-        serverLog:{appenders:['serverLog', 'mainLog', 'consoleout'], level:'ALL'},
+        default:{appenders:['sqlhistory', 'historyLog', 'consoleout'], level:'ALL'},
+        serverLog:{appenders:['serverLog', 'historyLog', 'consoleout'], level:'ALL'},
         clientErrorLog:{appenders:['clientErrorLog', 'consoleout'], level:'ALL'},
         fatalLog:{appenders:['fatalLog', 'consoleout'], level:'ALL'}
     }
@@ -83,7 +83,6 @@ var sql_obj;
 const S1 = "abcdefghkmnpqrstuvwxyz23456789";
 const S2 = "123456789"
 
-console.log("動作開始");
 serverLog.info("Server Start");
 
 const connection = mysql.createConnection({
@@ -389,6 +388,26 @@ app.post('/Operate/ListQR', (req, res)=>{
                     });
                 }
             });
+        }
+    }
+});
+
+app.post('/Operate/ShowLog', (req, res)=>{
+    let OperateID = req.body['OperateID'];
+    let OperateAuthCode = req.body['OperateAuthCode'];
+    let LogType = req.body['LogType'];
+    if(!OperateID || !OperateAuthCode || !LogType){
+        //パラメータ不足
+        serverLog.warn(`(Operate ShowLog) Lack Of Parameter ${JSON.stringify(req.body)}`);
+        res.json({ 'result': 'Lack Of Parameter' });
+    }else{
+        //パラメータOK
+        if(OperateID!=adOperateID || OperateAuthCode!=adOperateAuthCode){
+            //認証失敗
+            serverLog.warn(`(Operate ShowLog) Auth Faild ${JSON.stringify(req.body)}`);
+            res.json({ 'result': 'Auth Faild' });
+        }else{
+            res.send(fs.readFileSync(`./log/${LogType}.log`));
         }
     }
 });

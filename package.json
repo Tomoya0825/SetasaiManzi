@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@mysql/xdevapi": "^8.0.16",
+    "@pm2/io": "^4.2.5",
     "body-parser": "^1.19.0",
     "crypto": "^1.0.1",
     "express": "^4.17.1",

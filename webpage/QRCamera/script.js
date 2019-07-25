@@ -6,6 +6,7 @@ const baseUrl="https://v133-130-100-78.a029.g.tyo1.static.cnode.io";
 var id="";
 var auth_code="";
 
+
 if(!window.localStorage){
     //localStrage使えない(なぞブラウザ)
     alert("ご利用のブラウザはlocalStrageに非対応のため利用できません。");
@@ -164,7 +165,6 @@ function recordClientError(errmsg='', level='error'){
             "level": level
     });
 }
-
 
 
 //以下表示用関数

@@ -4,34 +4,35 @@ const mysql = require('mysql');
 const crypto = require('crypto');
 const log4js = require('log4js');
 const https = require('https');
+const helmet = require('helmet');
 const fs = require('fs');
+const line = require('@line/bot-sdk');
 const app = express();
+const client = new line.Client({channelAccessToken: `${fs.readFileSync('./AccessToken')}`});
 
 app.use(bodyParser.urlencoded({ extended: true })); //url-encoded
 app.use(bodyParser.json()); //json
 app.use(express.static('./webpage'));
+app.use(helmet());
 
 //#### ログ用 ####
 log4js.configure({
     appenders:{
-        sqlhistory:{type:'file', filename:'./log/sqlHistory.log'},
-        serverLog:{type:'file', filename: './log/serverLog.log'},
-        fatalLog:{type:'fileSync', filename: './log/serverLog.log'},
-        historyLog:{type:'file', filename:'./log/historyLog.log'},
-        clientErrorLog:{type:'file', filename:'./log/clientErrorLog.log'},
+        Server:{type:'file', filename: './log/server.log'},
+        Fatal:{type:'fileSync', filename: './log/server.log'},
+        ClientError:{type:'file', filename:'./log/clientError.log'},
         consoleout:{type:'console'}
     },
     categories:{
-        default:{appenders:['sqlhistory', 'historyLog', 'consoleout'], level:'ALL'},
-        serverLog:{appenders:['serverLog', 'historyLog', 'consoleout'], level:'ALL'},
-        clientErrorLog:{appenders:['clientErrorLog', 'consoleout'], level:'ALL'},
-        fatalLog:{appenders:['fatalLog', 'consoleout'], level:'ALL'}
+        default:{appenders:['Server', 'consoleout'], level:'ALL'},
+        ClientError:{appenders:['ClientError', 'consoleout'], level:'ALL'},
+        Fatal:{appenders:['Fatal', 'consoleout'], level:'ALL'}
     }
 });
-const sqlhistory = log4js.getLogger('sqlhistory');
-const serverLog = log4js.getLogger('serverLog');
-const fatalLog = log4js.getLogger('fatalLog');
-const clientErrorLog = log4js.getLogger('clientErrorLog')
+const sqlhistory = log4js.getLogger('Server');
+const serverLog = log4js.getLogger('Server');
+const fatalLog = log4js.getLogger('Fatal');
+const clientErrorLog = log4js.getLogger('ClientError');
 
 //Expressでの最初の部分での処理のエラーしょり(app.useの最後じゃないとダメ)
 app.use(function(err,req,res,next){
@@ -41,22 +42,21 @@ app.use(function(err,req,res,next){
             if(err['type']=='entity.parse.failed'){
                 //JSONじゃないのなげきたやばいばあい(こうげきされてる)
                 serverLog.warn(`(${sfunc}) Bad Request`);
-                res.json({"result":"Bad Request"});
+                res.status(400).json({"result":"Bad Request"});
             }else{
                 //なぞすぎる
                 serverLog.warn("Unknown Error");
-                res.json({"result":"Unknown Error"});
+                res.status(500).json({"result":"Unknown Error"});
             }
         }
     }catch(ex){
         //もっとなぞすぎる
+        res.status(500);
         serverLog.error("(ExHandle) Unknown Error");
     }
 });
 
-process.on("exit", (code)=>{
-    fatalLog.fatal("Fatal Error");
-});
+//非同期の中でエラー起きたらprocessでもキャッチできないので削除
 
 /*=======================
   ##TaskList##
@@ -77,13 +77,17 @@ https://qiita.com/ucan-lab/items/3ae911b7e13287a5b917
 // tcu_Ichgokan, tcu_Syokudou, …
 var qrlist = [];
 var st_qrlist="";
-//実行したSQL文確認用
-var sql_obj;
 //auth_code生成用 I i l 1 O o 0 J j は見ずらいかもしんないので使わない
 const S1 = "abcdefghkmnpqrstuvwxyz23456789";
 const S2 = "123456789"
 
-serverLog.info("Server Start");
+fatalLog.fatal("Server Restart");
+//######################################################################################
+//######################################################################################
+//######################################################################################
+//######################################################################################
+client.broadcast({type: 'text', text: 'サーバが再起動しました。'});
+//起動時にLINEに起動したよとPOST
 
 const connection = mysql.createConnection({
     host: 'localhost',
@@ -105,8 +109,7 @@ connection.beginTransaction((err)=>{
         serverLog.error("(QR) TRANSACTION Error");
         throw new Error("TRANSACTION Error");
     }else{
-        sql_obj=connection.query("DESCRIBE setasai 'tcu_%';", (err, results)=>{
-            sqlhistory.trace(`${sql_obj['sql']}`);
+        sqlhistory.trace(connection.query("DESCRIBE setasai 'tcu_%';", (err, results)=>{
             if(err){
                 serverLog.error("(QR) DESCRIBE Error");
                 connection.rollback();
@@ -125,7 +128,7 @@ connection.beginTransaction((err)=>{
                     }
                 });      
             }
-        });
+        })['sql']);
     }
 });
 
@@ -145,179 +148,266 @@ app.post('/API/Entry', (req, res) => {
         if(err){
             //トランザクション開始失敗
             serverLog.error("(Entry) Transaction Error");
-            res.json({ 'result': 'Server Error 00' });
+            res.status(500).json({ 'error': 'Server Error' });
         }else{
             //トランザクション開始成功
-            sql_obj=connection.query("INSERT INTO setasai(auth_code, user_agent, os, year, date, time) VALUES (?, ?, ?, ?, ?, ?);",
+            sqlhistory.trace(connection.query("INSERT INTO setasai(auth_code, user_agent, os, year, date, time) VALUES (?, ?, ?, ?, ?, ?);",
             [`${auth_code1}-${auth_code2}`, `${user_agent}`, `${getos(user_agent)}`, datetime.getFullYear(), datetime.getDate(), 
             `${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}`],(err) => {
-                sqlhistory.trace(`${sql_obj['sql']}`);
                 if(err){
                     //INSERT失敗
                     connection.rollback();
                     serverLog.error("(Entry) INSERT Error");
-                    res.json({ 'result': 'Server Error 01' });
+                    res.status(500).json({ 'error': 'Server Error' });
                 }else{
                     //INSERT成功
-                    sql_obj=connection.query("SELECT id, auth_code FROM setasai WHERE id=LAST_INSERT_ID();", (err, results) => {
-                        sqlhistory.trace(`${sql_obj['sql']}`);
+                    sqlhistory.trace(connection.query("SELECT id, auth_code FROM setasai WHERE id=LAST_INSERT_ID();", (err, results) => {
                         if(err){
                             //SELECT失敗
                             connection.rollback();
                             serverLog.error("(Entry) SELECT Error");
-                            res.json({ 'result': 'Server Error 02' });
+                            res.status(500).json({ 'error': 'Server Error' });
                         }else{
                             //SELECT成功
-                            //これがいまついかしたID = とうろくID と認証コード
-                            let rjson = {
-                                'result': 'OK',
-                                'id': `${results[0]['id']}`,
-                                'auth_code': `${results[0]['auth_code']}`
-                            };
                             connection.commit((err) => {
                                 if(err){
                                     //COMMIT失敗
+                                    connection.rollback();
                                     serverLog.error("(Entry) COMMIT Error");
-                                    rjson = { 'result': 'Server Error 03' };
+                                    res.status(500).json({ 'error': 'Server Error' });
                                 }else{
                                     //COMMIT成功
-                                    res.json(rjson);
+                                    res.status(200).json({
+                                        'id': `${results[0]['id']}`,
+                                        'auth_code': `${results[0]['auth_code']}`
+                                    });
                                     serverLog.info(`(Entry) {"id":"${results[0]['id']}", "auth_code":"${results[0]['auth_code']}"}`);
                                 }
                                 //最終処理
                             });//COMMIT
                         }
-                    });//クエリ SELECT
+                    })['sql']);//クエリ SELECT
                 }
-            });//クエリ INSERT
+            })['sql']);//クエリ INSERT
         }
     });//TRANSACTION
 });//POST
 
 
 //QR記録
-app.post('/API/RecordQR', (req, res) => {
+app.post('/API/RecordQR', (req, res)=>{
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
     let qr = req.body['qr'];
-    if(!id || !auth_code || !qr){
-        //パラメータ不足
-        serverLog.warn(`(RecordQR) Lack Of Parameter ${JSON.stringify(req.body)}`);
-        res.json({ 'result': 'Lack Of Parameter' });
-    }else{
-        connection.beginTransaction((err) => {
-            if(err){
-                //トランザクション開始失敗
-                serverLog.error("(RecordQR) Transaction Error");
-                res.json({ 'result': 'Server Error 10' });
-            }else{
-                //トランザクション開始成功
-                sql_obj=connection.query(`UPDATE setasai SET ??=1 WHERE id=? AND auth_code=?;`,
-                [qr, parseFloat(id), `${auth_code}`],(err, results)=>{
-                    sqlhistory.trace(`${sql_obj['sql']}`);
-                    if(err){
-                        //UPDATE失敗
-                        connection.rollback();
-                        if(err['message'].indexOf('Unknown column')!=-1){
-                            //存在しないQR名
-                            serverLog.warn(`(RecordQR) Unknown QR ${JSON.stringify(req.body)}`);
-                            res.json({ 'result': 'Unknown QR' });
+    auth_id(id, auth_code).then(()=>{
+        if(!qr){
+            serverLog.warn("(RecordQR) Lack Of Parameter");
+            res.status(400).json({ 'error': 'Lack Of Parameter' });
+        }else{
+            connection.beginTransaction((err)=>{
+                if(err){
+                    res.status(500).json({'error': 'Server Error'});
+                    serverLog.error("(RecordQR) Transaction Error");
+                }else{
+                    sqlhistory.trace(connection.query("UPDATE setasai SET ??=1 WHERE id=? AND auth_code=?;",
+                    [qr, id, auth_code], (err, results)=>{
+                        if(err){
+                            connection.rollback();
+                            if(err['message'].indexOf('Unknown column')!=-1){
+                                //存在しないQR名
+                                serverLog.warn(`(RecordQR) Unknown QR ${JSON.stringify(req.body)}`);
+                                res.status(400).json({ 'error': 'Unknown QR' });
+                            }else{
+                                serverLog.error("(RecordQR) Query Error");
+                                res.status(500).json({'error': 'Server Error'});
+                            }
                         }else{
-                            //その他エラー
-                            serverLog.error("(RecordQR) Update Error");
-                            res.json({ 'result': 'Server Error 11' });
-                        }              
-                    }else{
-                        //UPDATE成功
-                        if(results['message'].indexOf('Rows matched: 0')!=-1){ //WHERE該当なし
-                            serverLog.warn(`(RecordQR) Auth Faild ${JSON.stringify(req.body)}`);
-                            res.json({ 'result': 'Auth Faild' });
-                        }else if(results['message'].indexOf('Changed: 0')!=-1){ //変更なし
-                            serverLog.info(`(RecordQR) ${JSON.stringify(req.body)} (Alrady Recorded)`)
-                            res.json({ 'result': 'Alrady Recorded' });
-                        }else{ //変更OK
-                            connection.commit((err)=>{
-                                if(err){
-                                    //COMMIT失敗
-                                    connection.rollback();
-                                    serverLog.error("(RecordQR) COMMIT Error");
-                                    res.json({ 'result': 'Server Error 12' });
-                                }else{
-                                    //COMMIT成功
-                                    res.json({ 'result': 'OK' });
-                                    serverLog.info(`(RecordQR) ${JSON.stringify(req.body)}`);
-                                }
-                            });//COMMIT
+                            if(results['message'].indexOf('Changed: 0')!=-1){ //変更なし
+                                serverLog.info(`(RecordQR) ${JSON.stringify(req.body)} (Alrady Recorded)`);
+                                res.status(400).json({ 'error': 'Alrady Recorded' });
+                            }else{
+                                connection.commit((err)=>{
+                                    if(err){
+                                        //COMMIT失敗
+                                        connection.rollback();
+                                        serverLog.error("(RecordQR) COMMIT Error");
+                                        res.status(500).json({ 'error': 'Server Error' });
+                                    }else{
+                                        //COMMIT成功
+                                        res.status(200).json({ 'result': 'OK' });
+                                        serverLog.info(`(RecordQR) ${JSON.stringify(req.body)}`);
+                                    }
+                                });//COMMIT
+                            }
                         }
-                    }
-                });//クエリ UPDATE
-            }
-        });//TRANSACTION
-    }
-});//POST
+                    })['sql']);
+                }
+            });
+        }
+    }).catch((ex)=>{
+        if(ex['message']){
+            res.status(500).json({'error': 'Server Error'});
+            serverLog.error(ex['message']);
+        }else{
+            //クライアント側エラーのとき LackOfParameterとかAuthFaildとか
+            res.status(400).json({'error': `${ex}`});
+            serverLog.warn(ex);
+        }
+    });
+});
 
 
 //QR確認
 app.post('/API/GetQR', (req, res) => {
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
-    let reqtype="GetQR";
-    if(req.body['verification']=='true'){
-        reqtype="Verification";
-    }
-    if(!id || !auth_code){
-        //パラメータ不足
-        serverLog.warn(`(${reqtype}) Lack Of Parameter ${JSON.stringify(req.body)}`);
-        res.json({ 'result': 'Lack Of Parameter' });
-    }else{
-        //パラメータOK
-        connection.beginTransaction((err)=>{
-            if(err){
-                //トランザクション開始失敗
-                serverLog.error(`(${reqtype}) Transaction Error`);
-                res.json({ 'result': 'Server Error 20' });
-            }else{
-                //トランザクション開始成功
-                sql_obj=connection.query(`SELECT ?? FROM setasai WHERE id=? AND auth_code=?;`, 
-                [qrlist, parseFloat(id), `${auth_code}`],(err, results)=>{
-                    sqlhistory.trace(`${sql_obj['sql']}`);
-                    if(err){
-                        //SELECT失敗
-                        connection.rollback();
-                        serverLog.error(`(${reqtype}) SELECT Error`);
-                        res.json({ 'result': 'Server Error 21' });
-                    }else{
-                        //SELECT成功
-                        if(results.length==0){
-                            //WHERE該当なし
+    getqr_id(id, auth_code).then((result)=>{
+        res.status(200).json(result);
+    }).catch((ex)=>{
+        if(ex['message']){
+            res.status(500).json({'error': 'Server Error'});
+            serverLog.error(ex['message']);
+        }else{
+            //クライアント側エラーのとき LackOfParameterとかAuthFaildとか
+            res.status(400).json({'error': `${ex}`});
+            serverLog.warn(ex);
+        }
+    });
+});//POST
+
+
+//########################
+const secret = "世田谷祭2019";
+//########################
+
+
+app.post('/API/Goal', (req, res)=>{
+    let id = req.body['id'];
+    let auth_code = req.body['auth_code'];
+    getqr_id(id, auth_code).then((result)=>{
+        let is_achieved = true;
+        for(let i in result){
+            if(result[i] != 1){
+                is_achieved = false;
+                break;
+            }
+        }
+        if(is_achieved == false){
+            res.status(400).json({'error': 'Unachieved'});
+        }else{
+            connection.beginTransaction((err)=>{
+                if(err){
+                    res.status(500).json({'error': 'Server Error'});
+                    serverLog.error("(Goal) Transaction Error");
+                }else{
+                    sqlhistory.trace(connection.query("UPDATE setasai SET goal=1 WHERE id=? AND auth_code=?;",
+                    [id, auth_code], (err, results)=>{
+                        if(err){
                             connection.rollback();
-                            serverLog.warn(`(${reqtype}) Auth Faild ${JSON.stringify(req.body)}`);
-                            res.json({ 'result': 'Auth Faild' });
+                            res.status(500).json({'error': 'Server Error'});
+                            serverLog.error("(Goal) Query Error");
                         }else{
-                            //WHERE該当あり
                             connection.commit((err)=>{
                                 if(err){
-                                    //COMMIT失敗
                                     connection.rollback();
-                                    serverLog.error(`(${reqtype}) COMMIT Error`);
-                                    res.json({ 'result': 'Server Error 22' });
+                                    res.status(500).json({'error': 'Server Error'});
+                                    serverLog.error("(Goal) Commit Error");
                                 }else{
-                                    //COMMIT成功
-                                    let rsjson={"result": "OK"};
-                                    for(index in qrlist){
-                                        rsjson[`${qrlist[index]}`] = results[0][`${qrlist[index]}`];
+                                    if(results['message'].indexOf('Changed: 0')!=-1){ //変更なし つまりはゴール済み
+                                        res.status(400).json({'error': 'Already Goaled'});
+                                    }else{
+                                        res.status(200).json({'secret': `${secret}`});
                                     }
-                                    serverLog.info(`(${reqtype}) ${JSON.stringify(req.body)}`);                   
-                                    res.json(rsjson);                                   
                                 }
-                            });//COMMIT
+                            });
                         }
-                    }
-                });//クエリ SELECT
-            }
-        });//TRANSACTION
-    }
-});//POST
+                    })['sql']);
+                }
+            });
+        }
+    }).catch((ex)=>{
+        if(ex['message']){
+            res.status(500).json({'error': 'Server Error'});
+            serverLog.error(ex['message']);
+        }else{
+            //クライアント側エラーのとき LackOfParameterとかAuthFaildとか
+            res.status(400).json({'error': `${ex}`});
+            serverLog.warn(ex);
+        }
+    });
+});
+
+
+//認証してからQRをとってくる。QRの連想配列返す。ログはSQL以外とらない。エラーはauthの引継ぎ
+function getqr_id(id, auth_code){
+    return new Promise((resolve, reject)=>{
+        auth_id(id, auth_code).then(()=>{
+            //認証できた。
+            connection.beginTransaction((err)=>{
+                if(err){
+                    reject(new Error("(GetQR) Transaction Error"));
+                }else{
+                    sqlhistory.trace(connection.query("SELECT ?? FROM setasai WHERE id=? AND auth_code=?;",
+                    [qrlist, id, auth_code], (err, results)=>{
+                        if(err){
+                            reject(new Error("(GetQR) Query Error"));
+                        }else{
+                            connection.commit((err)=>{
+                                if(err){
+                                    reject(new Error("(GetQR) Commit Error"));
+                                }else{
+                                    let list={}
+                                    for(let i in qrlist){
+                                        list[qrlist[i]] = results[0][qrlist[i]]
+                                    }
+                                    resolve(list);
+                                }
+                            });
+                        }
+                    })['sql']);
+                }
+            });
+        }).catch((ex)=>{
+            reject(ex);
+        });
+    });
+}
+//認証成功したらresolveして、パラメータ不足ならreject("Lack Of Parameter")失敗ならreject("Auth Faild")
+//エラッタらrejectでエラーをスロー。ログはSQL以外とってない。
+function auth_id(id, auth_code){
+    return new Promise((resolve, reject)=>{
+        if(!id || !auth_code){
+            reject("Lack Of Parameter");
+        }else{
+            connection.beginTransaction((err)=>{
+                if(err){
+                    reject(new Error("(Auth) Transaction Error"));
+                }else{
+                    sqlhistory.trace(connection.query("SELECT * FROM setasai WHERE id=? AND auth_code=?;", [id, auth_code], (err, results)=>{
+                        if(err){
+                            connection.rollback();
+                            reject(new Error("(Auth) Query Error"));
+                        }else{
+                            connection.commit((err)=>{
+                                if(err){
+                                    connection.rollback();
+                                    reject(new Error("(Auth) Commit Error"));
+                                }else{
+                                    if(!results[0]){
+                                        reject("Auth Faild");
+                                    }else{
+                                        resolve();
+                                    }
+                                }
+                            })
+                        }
+                    })['sql']);
+                }
+            });
+        }
+    });
+}
+
 
 //クライアント側でしか察知できないエラー起きたとき。(おそらく全部は拾いきれないが一応のモノ)
 app.post('/API/RecordClientError',(req, res)=>{
@@ -336,32 +426,35 @@ const adOperateAuthCode="Setasai2019";
 //#################################################################
 //#################################################################
 
+app.get('/Operate/Alive', (req, res)=>{
+    res.send("OK.");
+});
+
 app.post('/Operate/ListQR', (req, res)=>{
     let OperateID = req.body['OperateID'];
     let OperateAuthCode = req.body['OperateAuthCode'];
     if(!OperateID || !OperateAuthCode){
         //パラメータ不足
         serverLog.warn(`(Operate ListQR) Lack Of Parameter ${JSON.stringify(req.body)}`);
-        res.json({ 'result': 'Lack Of Parameter' });
+        res.status(400).json({ 'error': 'Lack Of Parameter' });
     }else{
         //パラメータOK
         if(OperateID!=adOperateID || OperateAuthCode!=adOperateAuthCode){
             //認証失敗
             serverLog.warn(`(Operate ListQR) Auth Faild ${JSON.stringify(req.body)}`);
-            res.json({ 'result': 'Auth Faild' });
+            res.status(400).json({ 'error': 'Auth Faild' });
         }else{
             connection.beginTransaction((err)=>{
                 if(err){
                     //トランザクション開始失敗
                     serverLog.error("(Operate RemoveQR) Transaction Error");
-                    res.json({ 'result': 'Server Error 30' });
+                    res.status(500).json({ 'error': 'Server Error' });
                 }else{
-                    sql_obj=connection.query("SELECT ?? FROM setasai;",[qrlist],(err, results)=>{
-                        sqlhistory.trace(`${sql_obj['sql']}`);
+                    sqlhistory.trace(connection.query("SELECT ?? FROM setasai;",[qrlist],(err, results)=>{
                         if(err){
                             connection.rollback();
                             serverLog.error("(Operate ListQR) SELECT EROOR");
-                            res.json({ 'result': 'Server Error 31' });
+                            res.status(500).json({ 'error': 'Server Error' });
                             console.log(err);
                         }else{
                             let sumlist={};
@@ -377,37 +470,17 @@ app.post('/Operate/ListQR', (req, res)=>{
                                     //COMMIT失敗
                                     connection.rollback();
                                     serverLog.error("(Operate ListQR) COMMIT Error");
-                                    res.json({ 'result': 'Server Error 32' });
+                                    res.status(500).json({ 'error': 'Server Error' });
                                 }else{
                                     //COMMIT成功
-                                    res.json(sumlist);
+                                    res.status(200).json(sumlist);
                                     serverLog.info(`(Operate ListQR) Success.`);
                                 }
                             });
                         }
-                    });
+                    })['sql']);
                 }
             });
-        }
-    }
-});
-
-app.post('/Operate/ShowLog', (req, res)=>{
-    let OperateID = req.body['OperateID'];
-    let OperateAuthCode = req.body['OperateAuthCode'];
-    let LogType = req.body['LogType'];
-    if(!OperateID || !OperateAuthCode || !LogType){
-        //パラメータ不足
-        serverLog.warn(`(Operate ShowLog) Lack Of Parameter ${JSON.stringify(req.body)}`);
-        res.json({ 'result': 'Lack Of Parameter' });
-    }else{
-        //パラメータOK
-        if(OperateID!=adOperateID || OperateAuthCode!=adOperateAuthCode){
-            //認証失敗
-            serverLog.warn(`(Operate ShowLog) Auth Faild ${JSON.stringify(req.body)}`);
-            res.json({ 'result': 'Auth Faild' });
-        }else{
-            res.send(fs.readFileSync(`./log/${LogType}.log`));
         }
     }
 });

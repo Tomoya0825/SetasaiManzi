@@ -1,3 +1,5 @@
+
+
 //fetch API使う用
 function post(url = '', data = {}) {
     return fetch(url, {

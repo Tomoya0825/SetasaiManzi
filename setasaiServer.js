@@ -7,8 +7,11 @@ const https = require('https');
 const helmet = require('helmet');
 const fs = require('fs');
 const line = require('@line/bot-sdk');
+
+const config = JSON.parse(fs.readFileSync("config.json"));
+
 const app = express();
-const client = new line.Client({channelAccessToken: `${fs.readFileSync('./AccessToken')}`});
+const client = new line.Client({channelAccessToken: `${config['LineAccessToken']}`});
 
 app.use(bodyParser.urlencoded({ extended: true })); //url-encoded
 app.use(bodyParser.json()); //json
@@ -56,16 +59,6 @@ app.use(function(err,req,res,next){
     }
 });
 
-//非同期の中でエラー起きたらprocessでもキャッチできないので削除
-
-/*=======================
-  ##TaskList##
-  - SQLインジェクションほんとに大丈夫か(基本的には大丈夫っぽいけど)
-  -型わかるように
-  -各所修正しやすいように
-  -高速化
-=======================*/
-
 /*
 =========DB構成重要事項==========
 ER_NOT_SUPPORTED_AUTH_MODE ではまった
@@ -75,62 +68,80 @@ https://qiita.com/ucan-lab/items/3ae911b7e13287a5b917
 */
 
 // tcu_Ichgokan, tcu_Syokudou, …
-var qrlist = [];
-var st_qrlist="";
+var qrlist = {};
 //auth_code生成用 I i l 1 O o 0 J j は見ずらいかもしんないので使わない
 const S1 = "abcdefghkmnpqrstuvwxyz23456789";
 const S2 = "123456789"
 
 fatalLog.fatal("Server Restart");
-//######################################################################################
-//######################################################################################
-//######################################################################################
-//######################################################################################
 client.broadcast({type: 'text', text: 'サーバが再起動しました。'});
 //起動時にLINEに起動したよとPOST
 
 const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'setasai',
-    password: 'tcu',
-    port: 3306,
-    database: 'setasai'
+    host: config['MySQL']['Host'],
+    user: config['MySQL']['User'],
+    password: config['MySQL']['Password'],
+    port: config['MySQL']['Port'],
+    database: config['MySQL']['Database'],
 });
+const table = config['MySQL']['UserTable'];
 
 //ufwで 443ポート開放済み (実行にroot権限必須)
 https.createServer({
-    key: fs.readFileSync('./cert/privkey.pem'),
-    cert: fs.readFileSync('./cert/cert.pem'),
-    ca: fs.readFileSync('./cert/chain.pem')
+    key: fs.readFileSync(config['CertificateFile']['Key']),
+    cert: fs.readFileSync(config['CertificateFile']['Cert']),
+    ca: fs.readFileSync(config['CertificateFile']['Ca'])
 },app).listen(443);
 
-connection.beginTransaction((err)=>{
-    if(err){
-        serverLog.error("(QR) TRANSACTION Error");
-        throw new Error("TRANSACTION Error");
-    }else{
-        sqlhistory.trace(connection.query("DESCRIBE setasai 'tcu_%';", (err, results)=>{
-            if(err){
-                serverLog.error("(QR) DESCRIBE Error");
-                connection.rollback();
-                throw new Error("DESCRIBE Error");
-            }else{
-                connection.commit((err)=>{
-                    if(err){
-                        connection.rollback();
-                        throw new Error("COMMIT Error");
-                    }else{
-                        for(let index in results){
-                            qrlist.push(results[index]['Field']);
+new Promise((resolve, reject)=>{
+    connection.beginTransaction((err)=>{
+        if(err){
+            serverLog.error("(QR) TRANSACTION Error");
+            reject(new Error("TRANSACTION Error"));
+        }else{
+            sqlhistory.trace(connection.query("SHOW FULL columns from ?? LIKE 'tcu_%';", [table], (err, results)=>{
+                if(err){
+                    serverLog.error("(QR) DESCRIBE Error");
+                    connection.rollback();
+                    reject(new Error("DESCRIBE Error"));
+                }else{
+                    connection.commit((err)=>{
+                        if(err){
+                            connection.rollback();
+                            reject(new Error("COMMIT Error"));
+                        }else{
+                            let tmp_qr={};
+                            for(let index in results){
+                                if(!results[index]['Comment']){
+                                    reject("Location Error")
+                                }else{
+                                    tmp_qr[results[index]['Field']] = results[index]['Comment'];
+                                }
+                            }
+                            resolve(tmp_qr);
                         }
-                        st_qrlist = qrlist.join(', ');
-                        serverLog.info(`(QR) ${st_qrlist}`);
-                    }
-                });      
-            }
-        })['sql']);
+                    });      
+                }
+            })['sql']);
+        }
+    });
+}).then((result)=>{
+    qrlist = result;
+    let str_qr="";
+    for(key in qrlist){
+        str_qr += `${key}(${qrlist[key]}), `;
+    }
+    serverLog.info(`(QR) ${str_qr.slice(0,-2)}`);
+}).catch((ex)=>{
+    if(ex['message']){
+        client.broadcast({type: 'text', text: '[警告]\nDBの状態を確認してください。状態を確認し再起動してください。'});
+        serverLog.fatal("Start Error");
+    }else{
+        client.broadcast({type: 'text', text: '[警告]\nQRに場所が登録されていないものがあります。状態を確認し再起動してください。'});
+        serverLog.fatal("Start Error [QR Location]");
     }
 });
+
 
 
 //################################################################################################################
@@ -151,8 +162,8 @@ app.post('/API/Entry', (req, res) => {
             res.status(500).json({ 'error': 'Server Error' });
         }else{
             //トランザクション開始成功
-            sqlhistory.trace(connection.query("INSERT INTO setasai(auth_code, user_agent, os, year, date, time) VALUES (?, ?, ?, ?, ?, ?);",
-            [`${auth_code1}-${auth_code2}`, `${user_agent}`, `${getos(user_agent)}`, datetime.getFullYear(), datetime.getDate(), 
+            sqlhistory.trace(connection.query("INSERT INTO ??(auth_code, user_agent, os, year, date, time) VALUES (?, ?, ?, ?, ?, ?);",
+            [table, `${auth_code1}-${auth_code2}`, `${user_agent}`, `${getos(user_agent)}`, datetime.getFullYear(), datetime.getDate(), 
             `${datetime.getHours()}:${datetime.getMinutes()}:${datetime.getSeconds()}`],(err) => {
                 if(err){
                     //INSERT失敗
@@ -161,7 +172,7 @@ app.post('/API/Entry', (req, res) => {
                     res.status(500).json({ 'error': 'Server Error' });
                 }else{
                     //INSERT成功
-                    sqlhistory.trace(connection.query("SELECT id, auth_code FROM setasai WHERE id=LAST_INSERT_ID();", (err, results) => {
+                    sqlhistory.trace(connection.query("SELECT id, auth_code FROM ?? WHERE id=LAST_INSERT_ID();", [table], (err, results) => {
                         if(err){
                             //SELECT失敗
                             connection.rollback();
@@ -209,8 +220,8 @@ app.post('/API/RecordQR', (req, res)=>{
                     res.status(500).json({'error': 'Server Error'});
                     serverLog.error("(RecordQR) Transaction Error");
                 }else{
-                    sqlhistory.trace(connection.query("UPDATE setasai SET ??=1 WHERE id=? AND auth_code=?;",
-                    [qr, id, auth_code], (err, results)=>{
+                    sqlhistory.trace(connection.query("UPDATE ?? SET ??=1 WHERE id=? AND auth_code=?;",
+                    [table, qr, id, auth_code], (err, results)=>{
                         if(err){
                             connection.rollback();
                             if(err['message'].indexOf('Unknown column')!=-1){
@@ -275,12 +286,7 @@ app.post('/API/GetQR', (req, res) => {
     });
 });//POST
 
-
-//########################
-const secret = "世田谷祭2019";
-//########################
-
-
+//ゴール
 app.post('/API/Goal', (req, res)=>{
     let id = req.body['id'];
     let auth_code = req.body['auth_code'];
@@ -300,8 +306,8 @@ app.post('/API/Goal', (req, res)=>{
                     res.status(500).json({'error': 'Server Error'});
                     serverLog.error("(Goal) Transaction Error");
                 }else{
-                    sqlhistory.trace(connection.query("UPDATE setasai SET goal=1 WHERE id=? AND auth_code=?;",
-                    [id, auth_code], (err, results)=>{
+                    sqlhistory.trace(connection.query("UPDATE ?? SET goal=1 WHERE id=? AND auth_code=?;",
+                    [table, id, auth_code], (err, results)=>{
                         if(err){
                             connection.rollback();
                             res.status(500).json({'error': 'Server Error'});
@@ -316,7 +322,7 @@ app.post('/API/Goal', (req, res)=>{
                                     if(results['message'].indexOf('Changed: 0')!=-1){ //変更なし つまりはゴール済み
                                         res.status(400).json({'error': 'Already Goaled'});
                                     }else{
-                                        res.status(200).json({'secret': `${secret}`});
+                                        res.status(200).json({'secret': config['Secret']});
                                     }
                                 }
                             });
@@ -337,6 +343,11 @@ app.post('/API/Goal', (req, res)=>{
     });
 });
 
+//QR一覧
+app.post('/API/ListQR', (req, res)=>{
+    res.json(Object.values(qrlist));
+});
+
 
 //認証してからQRをとってくる。QRの連想配列返す。ログはSQL以外とらない。エラーはauthの引継ぎ
 function getqr_id(id, auth_code){
@@ -347,8 +358,8 @@ function getqr_id(id, auth_code){
                 if(err){
                     reject(new Error("(GetQR) Transaction Error"));
                 }else{
-                    sqlhistory.trace(connection.query("SELECT ?? FROM setasai WHERE id=? AND auth_code=?;",
-                    [qrlist, id, auth_code], (err, results)=>{
+                    sqlhistory.trace(connection.query("SELECT ?? FROM ?? WHERE id=? AND auth_code=?;",
+                    [Object.keys(qrlist), table, id, auth_code], (err, results)=>{
                         if(err){
                             reject(new Error("(GetQR) Query Error"));
                         }else{
@@ -357,8 +368,8 @@ function getqr_id(id, auth_code){
                                     reject(new Error("(GetQR) Commit Error"));
                                 }else{
                                     let list={}
-                                    for(let i in qrlist){
-                                        list[qrlist[i]] = results[0][qrlist[i]]
+                                    for(let key in qrlist){
+                                        list[qrlist[key]] = results[0][key]
                                     }
                                     resolve(list);
                                 }
@@ -383,7 +394,7 @@ function auth_id(id, auth_code){
                 if(err){
                     reject(new Error("(Auth) Transaction Error"));
                 }else{
-                    sqlhistory.trace(connection.query("SELECT * FROM setasai WHERE id=? AND auth_code=?;", [id, auth_code], (err, results)=>{
+                    sqlhistory.trace(connection.query("SELECT * FROM ?? WHERE id=? AND auth_code=?;", [table, id, auth_code], (err, results)=>{
                         if(err){
                             connection.rollback();
                             reject(new Error("(Auth) Query Error"));
@@ -419,17 +430,6 @@ app.post('/API/RecordClientError',(req, res)=>{
     }
 });
 
-//#################################################################
-//#################################################################
-const adOperateID="OperationUser";
-const adOperateAuthCode="Setasai2019";
-//#################################################################
-//#################################################################
-
-app.get('/Operate/Alive', (req, res)=>{
-    res.send("OK.");
-});
-
 app.post('/Operate/ListQR', (req, res)=>{
     let OperateID = req.body['OperateID'];
     let OperateAuthCode = req.body['OperateAuthCode'];
@@ -439,7 +439,7 @@ app.post('/Operate/ListQR', (req, res)=>{
         res.status(400).json({ 'error': 'Lack Of Parameter' });
     }else{
         //パラメータOK
-        if(OperateID!=adOperateID || OperateAuthCode!=adOperateAuthCode){
+        if(OperateID!=config['OperateUser']['ID'] || OperateAuthCode!=config['OperateUser']['AuthCode']){
             //認証失敗
             serverLog.warn(`(Operate ListQR) Auth Faild ${JSON.stringify(req.body)}`);
             res.status(400).json({ 'error': 'Auth Faild' });
@@ -450,7 +450,7 @@ app.post('/Operate/ListQR', (req, res)=>{
                     serverLog.error("(Operate RemoveQR) Transaction Error");
                     res.status(500).json({ 'error': 'Server Error' });
                 }else{
-                    sqlhistory.trace(connection.query("SELECT ?? FROM setasai;",[qrlist],(err, results)=>{
+                    sqlhistory.trace(connection.query("SELECT ?? FROM ??;",[Object.keys(qrlist), table],(err, results)=>{
                         if(err){
                             connection.rollback();
                             serverLog.error("(Operate ListQR) SELECT EROOR");
@@ -458,12 +458,12 @@ app.post('/Operate/ListQR', (req, res)=>{
                             console.log(err);
                         }else{
                             let sumlist={};
-                            for(let i in qrlist){
+                            for(let key in qrlist){
                                 let tmp_sum=0;
                                 for(let j in results){
-                                    tmp_sum+=results[j][qrlist[i]];
+                                    tmp_sum+=results[j][key];
                                 }
-                                sumlist[`${qrlist[i]}-sum`] = tmp_sum;
+                                sumlist[`${qrlist[key]}`] = tmp_sum;
                             }
                             connection.commit((err)=>{
                                 if(err){

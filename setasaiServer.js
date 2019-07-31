@@ -101,8 +101,8 @@ new Promise((resolve, reject)=>{
         }else{
             sqlhistory.trace(connection.query("SHOW FULL columns from ?? LIKE 'tcu_%';", [table], (err, results)=>{
                 if(err){
-                    serverLog.error("(QR) DESCRIBE Error");
                     connection.rollback();
+                    serverLog.error("(QR) DESCRIBE Error");
                     reject(new Error("DESCRIBE Error"));
                 }else{
                     connection.commit((err)=>{
@@ -152,6 +152,9 @@ app.post('/API/Entry', (req, res) => {
     let user_agent = 'Unknown';
     if(req.header('User-Agent')){
         user_agent = req.header('User-Agent');
+    }
+    if(user_agent.length>200){
+        user_agent = 'Unknown(Too Long)';
     }
     let auth_code1 = Array.from(crypto.randomFillSync(new Uint8Array(6))).map((n) => S1[n % S1.length]).join('');
     let auth_code2 = Array.from(crypto.randomFillSync(new Uint8Array(6))).map((n) => S2[n % S2.length]).join('');

@@ -26,7 +26,8 @@ if(!localStorage.getItem("id") || !localStorage.getItem("auth_code")){
     //ブラウザにユーザ情報なし
     alert("QRコードの読み取りのためにカメラの使用許可をお願いします。");
     post(`${baseUrl}/API/Entry`).then((res)=>{
-        if(res['result']=='OK'){
+        if(!res['error']){
+            //OK
             localStorage.setItem('id', res['id']);
             localStorage.setItem('auth_code', res['auth_code']);
             id = res['id'];
@@ -52,22 +53,18 @@ if(!localStorage.getItem("id") || !localStorage.getItem("auth_code")){
         "auth_code": auth_code,
         "verification": 'true'
     }).then((res)=>{
-        if(res['result']=='OK'){
-            //問題ナシ
-        }else if(res['result']=='Auth Faild'){
+        if(!res['error']){
+            //OK
+
+        }else if(res['error']=='Auth Faild' || res['error']=='Lack Of Parameter'){
             //アカウント情報新しく作る必要アリ @@@@@@@@ 対応どうする @@@@@@@@
             alert("IDを新規発行します。");
             recordClientError('Re-Entry');
             localStorage.removeItem("id");
             localStorage.removeItem("auth_code");
             location.reload();
-        }else if(res['result']=='Lack Of Parameter'){
-            //プライベートブラウジングの可能性
-            alert(`プライベートブラウジングの場合は通常モードでご利用ください。通常モードでご利用の場合、非対応ブラウザの可能性があります。`)
-            recordClientError('Possibilities of private browsing', 'info');
-            location.href = "../index.html";
         }else{
-            //エラー
+            //その他エラー
             alert("エラーが発生しました。");
             recordClientError('(Verification) GetQR Error');
             location.href = "../index.html" ;
@@ -107,14 +104,14 @@ navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:"environment
                 "auth_code": auth_code,
                 "qr": qrobj['data']
             }).then((res)=>{
-                if(res['result']=='OK'){
-                    location.href = "../Uniquepage/index.html?result=ok";//ok
+                if(!res['error']){
                     //登録した場合
-                }else if(res['result']=='Alrady Recorded'){
-                    location.href = "../Uniquepage/index.html?result=recoded";//recoded
+                    location.href = "../Uniquepage/index.html?result=ok";//ok
+                }else if(res['error']=='Alrady Recorded'){
                     //登録済みの場合
+                    location.href = "../Uniquepage/index.html?result=recoded";//recoded
                 }else{
-                    //エラー
+                    //その他エラー
                     alert("エラーが発生しました。");
                     recordClientError('RecordQR Error');
                     location.reload();

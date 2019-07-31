@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql');
 const crypto = require('crypto');
 const log4js = require('log4js');
+const http = require('http');
 const https = require('https');
 const helmet = require('helmet');
 const fs = require('fs');
@@ -92,6 +93,12 @@ https.createServer({
     cert: fs.readFileSync(config['CertificateFile']['Cert']),
     ca: fs.readFileSync(config['CertificateFile']['Ca'])
 },app).listen(443);
+
+//httpリダイレクト用。
+const exhttp = express();
+http.createServer(exhttp.all('*', (req, res)=>{
+    res.redirect(`https://${req['hostname']}${req['url']}`);
+})).listen(80);
 
 new Promise((resolve, reject)=>{
     connection.beginTransaction((err)=>{

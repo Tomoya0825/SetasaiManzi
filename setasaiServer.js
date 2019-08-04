@@ -97,7 +97,7 @@ https.createServer({
 //httpリダイレクト用。
 const exhttp = express();
 http.createServer(exhttp.all('*', (req, res)=>{
-    res.redirect(`https://${req['hostname']}${req['url']}`);
+    res.redirect(301, `https://${req['hostname']}${req['url']}`);
 })).listen(80);
 
 new Promise((resolve, reject)=>{
@@ -354,7 +354,7 @@ app.post('/API/Goal', (req, res)=>{
 });
 
 //QR一覧
-app.post('/API/ListQR', (req, res)=>{
+app.post('/API/ListLocation', (req, res)=>{
     res.json(Object.values(qrlist));
 });
 
@@ -493,6 +493,11 @@ app.post('/Operate/ListQR', (req, res)=>{
             });
         }
     }
+});
+
+//最後じゃないとダメ
+app.use(function(req, res, next){
+    res.status(404).send(fs.readFileSync('./404page.html', {encoding: 'utf-8'}));
 });
 
 

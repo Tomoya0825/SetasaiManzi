@@ -34,12 +34,12 @@ if(!localStorage.getItem("id") || !localStorage.getItem("auth_code")){
             auth_code = res['auth_code'];
         }else{
             //エラー(通信?やサーバ側)
-            alert("エラーが発生しました。");
+            alert("エラーが発生しました。(0001)");
             recordClientError('Entry Error');
             location.href = "../index.html";//まあ一応(できないかもだけど)
         }
     }).catch((err)=>{
-        alert("エラーが発生しました。");
+        alert("エラーが発生しました。(0002)");
         recordClientError('Entry Post Error');
         location.reload();
     });
@@ -65,7 +65,7 @@ if(!localStorage.getItem("id") || !localStorage.getItem("auth_code")){
             location.reload();
         }else{
             //その他エラー
-            alert("エラーが発生しました。");
+            alert("エラーが発生しました。(0003)");
             recordClientError('(Verification) GetQR Error');
             location.href = "../index.html" ;
         }
@@ -112,12 +112,12 @@ navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:"environment
                     location.href = "../Uniquepage/index.html?result=recoded";//recoded
                 }else{
                     //その他エラー
-                    alert("エラーが発生しました。");
+                    alert("エラーが発生しました。(0004)");
                     recordClientError('RecordQR Error');
                     location.reload();
                 }
             }).catch((err)=>{
-                alert("エラーが発生しました。");
+                alert("エラーが発生しました。(0005)");
                 recordClientError('RecordQR Post Error');
                 location.reload();
             });
@@ -126,7 +126,7 @@ navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:"environment
         }
     },100);
 }).catch((err)=>{
-    alert("エラーが発生しました。\nカメラをブロックしてしまった場合、ブラウザの設定よりカメラの使用許可をお願いします。");
+    alert("エラーが発生しました。(0006)\nカメラをブロックしてしまった場合、ブラウザの設定よりカメラの使用許可をお願いします。");
     recordClientError('getUserMedia Error');
     location.href = "../index.html";
 });

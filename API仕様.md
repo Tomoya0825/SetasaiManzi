@@ -13,14 +13,11 @@
 ### 固有エラー 例
 * なし
 
-
-
+<br>
 ---
-
-
+<br>
 
 ## QR記録
-
 ### URL
 /API/RecordQR
 ### パラメータ 例
@@ -43,14 +40,11 @@
 {"error": "Unknown QR"}			//パラメータのQRがサーバ側で定義されていない
 ```
 
-
-
+<br>
 ---
-
-
+<br>
 
 ## QR取得
-
 ### URL
 /API/GetQR
 ### パラメータ 例
@@ -70,14 +64,11 @@
 ### 固有エラー 例
 * なし
 
-
-
+<br>
 ---
-
-
+<br>
 
 ## ゴール記録
-
 ### URL
 /API/Goal
 ### パラメータ 例
@@ -99,14 +90,11 @@
 {"error": "Already Goaled"}		//すでにゴール済み
 ```
 
-
-
+<br>
 ---
-
-
+<br>
 
 ## QR設置箇所取得
-
 ### URL
 /API/GetLocation
 ### パラメータ 例
@@ -121,14 +109,11 @@
 ### 固有エラー 例
 * なし
 
-
-
+<br>
 ---
-
-
+<br>
 
 ## (共通のエラー)
-
 ```json
 {"error": "Server Error"}		//サーバ側のエラー
 {"error": "Unknown Error"}		//不明なエラー
@@ -138,4 +123,3 @@
 {"error": "Auth Faild"}			//パラメータのidとauth_codeで認証できない
 {"error": "Lack Of Parameter"}	//パラメータが足りない
 ```
-
